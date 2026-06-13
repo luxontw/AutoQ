@@ -10,7 +10,7 @@ project(autoq)
 #set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -pg")
 
 include_directories(../include)
-include_directories(../include/z3)
+include_directories(BEFORE ../include/z3)
 include_directories(../include/antlr4-runtime)
 
 # generate the file with version names

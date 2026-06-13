@@ -102,12 +102,19 @@ void print_loop_invariant_result(bool verify) {
 
 void print_equivalence_result(bool result,
                                const chrono::steady_clock::time_point& start) {
+    auto elapsed = chrono::steady_clock::now() - start;
+    auto elapsed_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(elapsed).count();
     std::ostringstream oss;
     oss << "The two quantum programs are verified to be ["
         << (result ? "equal" : "unequal") << "] in ["
-        << AUTOQ::Util::Convert::ToString(chrono::steady_clock::now() - start)
+        << AUTOQ::Util::Convert::ToString(elapsed)
         << "] with [" << (AUTOQ::Util::getPeakRSS() / kBytesPerMB) << "MB] memory usage.";
     AUTOQ::Util::Log::info(oss.str());
+
+    std::ostringstream bench;
+    bench << "[bench_seconds=" << std::fixed << std::setprecision(9)
+          << (static_cast<double>(elapsed_ns) / 1e9) << "]";
+    AUTOQ::Util::Log::info(bench.str());
 }
 }  // namespace
 
@@ -144,25 +151,38 @@ void set_timeout(unsigned int seconds, AUTOQ::ConcreteAutomata* aut1, AUTOQ::Con
 
 template<typename Symbol>
 static void run_execution_impl(const std::string& pre, const std::string& circuit,
-                               const ParameterMap& params) {
+                               const ParameterMap& params, bool bench_only,
+                               const chrono::steady_clock::time_point& bench_start) {
     auto [autVec, qp] = AUTOQ::Parsing::TimbukParser<Symbol>::ReadTwoAutomata(pre, pre, circuit);
     auto aut = autVec.at(0);
     autVec.erase(autVec.begin(), autVec.begin() + kAutVecEraseCount);
     bool verify = aut.execute(circuit, qp, autVec, params);
+    auto bench_elapsed = chrono::steady_clock::now() - bench_start;
+    auto bench_elapsed_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(bench_elapsed).count();
+    // Emit bench line FIRST so callers see it regardless of how long the
+    // post-execute steps (loop-invariant check, print_language) take. With
+    // --bench we skip print_language entirely — for large state sets it can
+    // dominate wall-clock time and is not part of setup+execution itself.
+    std::ostringstream bench;
+    bench << "[bench_seconds=" << std::fixed << std::setprecision(9)
+          << (static_cast<double>(bench_elapsed_ns) / 1e9) << "]";
+    AUTOQ::Util::Log::info(bench.str());
     if (!autVec.empty()) print_loop_invariant_result(verify);
-    aut.print_language(kOutputLabel);
+    if (!bench_only)
+        aut.print_language(kOutputLabel);
 }
 
 static void run_execution(const std::string& pre, const std::string& circuit,
-                          const ParameterMap& params) {
+                          const ParameterMap& params, bool bench_only,
+                          const chrono::steady_clock::time_point& bench_start) {
     auto aut1 = ReadAutomaton(pre);
     if (std::holds_alternative<AUTOQ::PredicateAutomata>(aut1)) {
         THROW_AUTOQ_ERROR(EM::kPredicatePrecondition);
     }
     if (std::holds_alternative<AUTOQ::SymbolicAutomata>(aut1) || AUTOQ::SymbolicAutomata::check_the_invariants_types(circuit) == "Symbolic")
-        run_execution_impl<AUTOQ::Symbol::Symbolic>(pre, circuit, params);
+        run_execution_impl<AUTOQ::Symbol::Symbolic>(pre, circuit, params, bench_only, bench_start);
     else
-        run_execution_impl<AUTOQ::Symbol::Concrete>(pre, circuit, params);
+        run_execution_impl<AUTOQ::Symbol::Concrete>(pre, circuit, params, bench_only, bench_start);
 }
 
 static void run_equivalence(const std::string& circuit1, const std::string& circuit2,
@@ -240,15 +260,28 @@ try {
     std::string pre, circuit, post, circuit1, circuit2;
 
     bool summarize_loops = false;
+    bool ex_bench_only = false;
+    // Captured in each subcommand callback the moment circuit setup
+    // (adjust_N_in_nTuple file scans) begins, so bench_seconds / running time
+    // covers setup + core — matching the QCEC side, whose timer brackets
+    // qcec.verify (which itself reads/parses the QASM). Excludes only
+    // interpreter/CLI-argument parsing, not setup.
+    auto ex_start = chrono::steady_clock::now();
     CLI::App* execution = app.add_subcommand("ex", "Execute a quantum circuit with a given precondition.");
     execution->add_option(kOptPreHsl, pre, kPreFileOpt)->required()->type_name("");
     execution->add_option(kOptCircuitQasm, circuit, kCircuitFileOpt)->required()->type_name("");
     execution->add_flag("--loopsum", summarize_loops, kLoopsumOpt);
+    execution->add_flag("--bench", ex_bench_only,
+                        "Benchmark mode: emit [bench_seconds=...] for symbolic "
+                        "setup plus execution; skip print_language so output-set "
+                        "enumeration does not dominate wall-clock time.");
     execution->callback([&]() {
+        ex_start = chrono::steady_clock::now();
         adjust_N_in_nTuple(circuit);
     });
 
     bool latex = false;
+    auto ver_start = chrono::steady_clock::now();
     CLI::App* verification = app.add_subcommand("ver", "Verify the execution result against a given postcondition.");
     verification->add_option(kOptPreHsl, pre, kPreFileOpt)->required()->type_name("");
     verification->add_option(kOptCircuitQasm, circuit, kCircuitFileOpt)->required()->type_name("");
@@ -256,15 +289,22 @@ try {
     verification->add_flag("--loopsum", summarize_loops, kLoopsumOpt);
     verification->add_flag("-l,--latex", latex, kLatexOpt);
     verification->callback([&]() {
+        ver_start = chrono::steady_clock::now();
         adjust_N_in_nTuple(circuit);
     });
 
+    // Captured by the eq callback the moment circuit setup (adjust_N_in_nTuple
+    // file scans) begins, so bench_seconds covers setup + core — matching the
+    // QCEC side, whose timer brackets qcec.verify (which itself reads/parses
+    // the QASM). Excludes only interpreter/CLI-argument parsing, not setup.
+    auto eq_start = chrono::steady_clock::now();
     CLI::App* equivalence_checking = app.add_subcommand("eq", "Check equivalence of two given quantum circuits.");
     equivalence_checking->add_option(kOptCircuit1Qasm, circuit1, kCircuitFileOpt)->required()->type_name("");
     equivalence_checking->add_option(kOptCircuit2Qasm, circuit2, kCircuitFileOpt)->required()->type_name("");
     equivalence_checking->add_flag("--loopsum", summarize_loops, kLoopsumOpt);
     equivalence_checking->add_flag("-l,--latex", latex, kLatexOpt);
     equivalence_checking->callback([&]() {
+        eq_start = chrono::steady_clock::now();
         adjust_N_in_nTuple(circuit1);
         adjust_N_in_nTuple(circuit2);
     });
@@ -284,7 +324,6 @@ try {
         return 0;
     }
 
-    auto start = chrono::steady_clock::now();
     // bool runConcrete; // or runSymbolic
     ParameterMap params;
     params[kParamLoop] = kLoopManual;
@@ -292,11 +331,11 @@ try {
         params[kParamLoop] = kLoopSymbolic;
     }
     if (execution->parsed()) {
-        run_execution(pre, circuit, params);
+        run_execution(pre, circuit, params, ex_bench_only, ex_start);
     } else if (verification->parsed()) {
-        run_verification(pre, post, circuit, params, latex, start);
+        run_verification(pre, post, circuit, params, latex, ver_start);
     } else if (equivalence_checking->parsed()) {
-        run_equivalence(circuit1, circuit2, params, latex, start);
+        run_equivalence(circuit1, circuit2, params, latex, eq_start);
     } else if (print->parsed()) {
         auto aut = ReadAutomaton(pre);
         std::visit([](auto& aut){

@@ -169,7 +169,7 @@ find_package(Boost 1.71.0...1.89.0 CONFIG COMPONENTS # 1.89.0 is for macOS on Gi
 # Boost.System has been header-only since 1.69.
 # If someone increases minimum Boost to 1.71 then can just remove the system component.
 include_directories(${Boost_INCLUDE_DIRS})
-include_directories(../include/z3)
+include_directories(BEFORE ../include/z3)
 
 # Doxygen - voluntary
 find_package(Doxygen)

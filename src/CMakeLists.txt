@@ -46,7 +46,7 @@ elseif (UNIX)
         target_link_libraries(lsta "${CMAKE_CURRENT_SOURCE_DIR}/../libz3.so.4.12")
     endif ()
 endif ()
-include_directories(../include/z3)
+include_directories(BEFORE ../include/z3)
 
 ##############################################################################
 #                              DEPENDENCIES - ANTLR
