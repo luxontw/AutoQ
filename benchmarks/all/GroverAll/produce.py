@@ -1,6 +1,10 @@
 #!/usr/bin/python3
 # GroverAll: same Grover circuit as benchmarks/all/Grover, but the precondition
-# is the *set of all computational basis states* instead of the single |0...0>.
+# is the set of all computational basis states over the INPUT qubits (work
+# register + oracle target) instead of the single |0...0>. The n-2 Toffoli
+# v-chain ancilla are pinned to |0> (clean-ancilla): the chain implements
+# C^(n-1)X only on that subspace, so sweeping ancilla would run the circuit on
+# inputs where it is not Grover at all — and blow up AutoQ's output automaton.
 #
 # This is meant for *simulation* of the circuit over every basis state via the
 # `ex` subcommand (which needs only pre.hsl + circuit.qasm), e.g.
@@ -20,10 +24,13 @@ for n in sizes:
     q = 2 * n - 1
     n_str = ensure_bench_dir_for_n(n)
     ###########################################################################
-    # Precondition: the set of ALL 2^q computational basis states.
-    # `i` is a single binary-string variable of length q, so { |i> : |i|=q }
-    # ranges over every basis state |0...0> ... |1...1>.
-    write_hsl(n_str + '/pre.hsl', "{ |i> : |i|=" + str(q) + " }\n", header="Extended Dirac\n")
+    # Precondition: all basis states over the input qubits, ancilla clean.
+    # Layout is [work(n) | vchain-ancilla(n-2) | target(1)]: `i` sweeps the n
+    # work qubits, the ancilla stay literal 0, `j` sweeps the oracle target
+    # (MCToffoli-style pattern).
+    write_hsl(n_str + '/pre.hsl',
+              "{ |i" + "0" * (n - 2) + "j> : |i|=" + str(n) + ", |j|=1 }\n",
+              header="Extended Dirac\n")
     ###########################################################################
     with open(n_str + '/circuit.qasm', 'w') as file:
         w = range(n)

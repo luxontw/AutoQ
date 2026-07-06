@@ -1,0 +1,32 @@
+OPENQASM 2.0;
+include "qelib1.inc";
+gate mcmt q0,q1,q2,q3,q4,q5,q6,q7,q8,q9,q10,q11,q12,q13,q14,q15,q16,q17,q18,q19,q20,q21,q22,q23 { cx q0,q1; cx q0,q2; cx q0,q3; cx q0,q4; cx q0,q5; cx q0,q6; cx q0,q7; cx q0,q8; cx q0,q9; cx q0,q10; cx q0,q11; cx q0,q12; cx q0,q13; cx q0,q14; cx q0,q15; cx q0,q16; cx q0,q17; cx q0,q18; cx q0,q19; cx q0,q20; cx q0,q21; cx q0,q22; cx q0,q23; }
+gate gate_ModularAdder q0,q1,q2,q3,q4,q5,q6,q7,q8,q9,q10,q11,q12,q13,q14,q15,q16,q17,q18,q19,q20,q21,q22,q23 { mcmt q11,q0,q1,q2,q3,q4,q5,q6,q7,q8,q9,q10,q12,q13,q14,q15,q16,q17,q18,q19,q20,q21,q22,q23; cx q11,q12; cx q0,q11; rccx q12,q11,q0; cx q0,q11; cx q11,q13; cx q1,q11; rccx q13,q11,q1; cx q1,q11; cx q11,q14; cx q2,q11; rccx q14,q11,q2; cx q2,q11; cx q11,q15; cx q3,q11; rccx q15,q11,q3; cx q3,q11; cx q11,q16; cx q4,q11; rccx q16,q11,q4; cx q4,q11; cx q11,q17; cx q5,q11; rccx q17,q11,q5; cx q5,q11; cx q11,q18; cx q6,q11; rccx q18,q11,q6; cx q6,q11; cx q11,q19; cx q7,q11; rccx q19,q11,q7; cx q7,q11; cx q11,q20; cx q8,q11; rccx q20,q11,q8; cx q8,q11; cx q11,q21; cx q9,q11; rccx q21,q11,q9; cx q9,q11; cx q11,q22; cx q10,q11; rccx q22,q11,q10; cx q10,q11; cx q11,q23; cx q10,q11; rccx q22,q11,q10; cx q10,q11; cx q10,q22; cx q9,q11; rccx q21,q11,q9; cx q9,q11; cx q9,q21; cx q8,q11; rccx q20,q11,q8; cx q8,q11; cx q8,q20; cx q7,q11; rccx q19,q11,q7; cx q7,q11; cx q7,q19; cx q6,q11; rccx q18,q11,q6; cx q6,q11; cx q6,q18; cx q5,q11; rccx q17,q11,q5; cx q5,q11; cx q5,q17; cx q4,q11; rccx q16,q11,q4; cx q4,q11; cx q4,q16; cx q3,q11; rccx q15,q11,q3; cx q3,q11; cx q3,q15; cx q2,q11; rccx q14,q11,q2; cx q2,q11; cx q2,q14; cx q1,q11; rccx q13,q11,q1; cx q1,q11; cx q1,q13; cx q0,q11; rccx q12,q11,q0; cx q0,q11; cx q0,q12; mcmt q11,q0,q1,q2,q3,q4,q5,q6,q7,q8,q9,q10,q12,q13,q14,q15,q16,q17,q18,q19,q20,q21,q22,q23; }
+qreg q[24];
+creg meas[24];
+gate_ModularAdder q[0],q[1],q[2],q[3],q[4],q[5],q[6],q[7],q[8],q[9],q[10],q[11],q[12],q[13],q[14],q[15],q[16],q[17],q[18],q[19],q[20],q[21],q[22],q[23];
+barrier q[0],q[1],q[2],q[3],q[4],q[5],q[6],q[7],q[8],q[9],q[10],q[11],q[12],q[13],q[14],q[15],q[16],q[17],q[18],q[19],q[20],q[21],q[22],q[23];
+measure q[0] -> meas[0];
+measure q[1] -> meas[1];
+measure q[2] -> meas[2];
+measure q[3] -> meas[3];
+measure q[4] -> meas[4];
+measure q[5] -> meas[5];
+measure q[6] -> meas[6];
+measure q[7] -> meas[7];
+measure q[8] -> meas[8];
+measure q[9] -> meas[9];
+measure q[10] -> meas[10];
+measure q[11] -> meas[11];
+measure q[12] -> meas[12];
+measure q[13] -> meas[13];
+measure q[14] -> meas[14];
+measure q[15] -> meas[15];
+measure q[16] -> meas[16];
+measure q[17] -> meas[17];
+measure q[18] -> meas[18];
+measure q[19] -> meas[19];
+measure q[20] -> meas[20];
+measure q[21] -> meas[21];
+measure q[22] -> meas[22];
+measure q[23] -> meas[23];

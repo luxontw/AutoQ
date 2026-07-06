@@ -1,2 +1,2 @@
 Extended Dirac
-{ |i> : |i|=7 }
+{ |i00j> : |i|=4, |j|=1 }
